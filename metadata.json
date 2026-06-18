@@ -1,0 +1,6 @@
+{
+  "name": "库存智能 (Inventory Intelligence)",
+  "description": "全球网络性能分析看板，提供库存健康指数、区域分布及关键性能告警。",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
