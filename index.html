@@ -1,13 +1,985 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库存智能 - Inventory Intelligence</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'bg-main': '#f1f5f9',
+                        'sidebar-bg': '#ffffff',
+                        'primary-brand': '#2563eb',
+                        'primary-dark': '#1d4ed8',
+                        'text-dark': '#0f172a',
+                        'text-muted': '#64748b',
+                        'border-color': '#e2e8f0',
+                        'success-color': '#10b981',
+                        'error-color': '#ef4444',
+                        'warning-color': '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles to match professional polish */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: all 0.2s ease-in-out;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        /* Pulse synchronization animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+        .sync-pulse {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+    <!-- Lucide Icons Scripts -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-bg-main min-h-screen text-text-dark flex flex-col overflow-x-hidden">
 
+    <!-- Top Navigation Bar -->
+    <header class="fixed top-0 w-full z-50 flex justify-between items-center px-8 h-16 bg-sidebar-bg border-b border-border-color shadow-sm">
+        <div class="flex items-center gap-10">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-primary-brand rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10">
+                    <i data-lucide="package" class="text-white w-5 h-5"></i>
+                </div>
+                <span class="text-lg font-bold text-text-dark tracking-tight">Inventory Intelligence</span>
+                <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border border-blue-200">Enterprise</span>
+            </div>
+            <nav class="hidden md:flex gap-8 items-center h-full">
+                <!-- Tabs with custom active triggers -->
+                <button onclick="switchCategory('region')" id="tab-region" class="category-tab text-sm font-semibold transition-all h-16 border-b-2 flex items-center text-primary-brand border-primary-brand">区域</button>
+                <button onclick="switchCategory('category')" id="tab-category" class="category-tab text-sm font-semibold transition-all h-16 border-b-2 flex items-center text-text-muted hover:text-text-dark border-transparent">品类</button>
+                <button onclick="switchCategory('time')" id="tab-time" class="category-tab text-sm font-semibold transition-all h-16 border-b-2 flex items-center text-text-muted hover:text-text-dark border-transparent">时间范围</button>
+            </nav>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- Simulated Sync State Button -->
+            <button onclick="refreshSyncData()" id="sync-btn" class="flex items-center gap-2 text-xs font-semibold text-text-muted hover:text-text-dark transition-all py-1.5 px-3 rounded-full hover:bg-slate-100 border border-border-color bg-white">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-success-color shrink-0"></i>
+                <span id="sync-text">上次同步: 12分钟前</span>
+            </button>
+            <button onclick="showGeneralNotification('当前系统状态：全部节点运行稳定！')" class="text-text-muted hover:text-text-dark p-2 transition-colors rounded-lg hover:bg-slate-100 relative">
+                <i data-lucide="bell" class="w-5 h-5"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-error-color rounded-full"></span>
+            </button>
+            <button onclick="switchView('settings')" class="text-text-muted hover:text-text-dark p-2 transition-colors rounded-lg hover:bg-slate-100">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </button>
+            <!-- User Status Header -->
+            <div class="flex items-center gap-3 ml-2 pl-4 border-l border-border-color">
+                <div class="text-right hidden sm:block">
+                    <p class="text-xs font-semibold text-text-dark">Sarah Jenkins</p>
+                    <p class="text-[10px] text-text-muted">Global Operations Admin</p>
+                </div>
+                <div class="w-9 h-9 rounded-full bg-slate-100 border border-border-color overflow-hidden flex items-center justify-center text-primary-brand">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Side Navigation Drawer -->
+    <aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col border-r border-border-color bg-sidebar-bg z-40 py-6">
+        <nav class="space-y-1">
+            <button onclick="switchView('overview')" id="nav-overview" class="nav-item w-full flex items-center gap-3 px-6 py-3 transition-all duration-200 group border-l-4 border-primary-brand bg-slate-50 text-primary-brand font-semibold">
+                <i data-lucide="layout-dashboard" class="w-4 h-4 text-primary-brand"></i>
+                <span class="text-xs tracking-tight uppercase">Overview 看板概览</span>
+            </button>
+            <button onclick="switchView('risk')" id="nav-risk" class="nav-item w-full flex items-center gap-3 px-6 py-3 transition-all duration-200 group border-l-4 border-transparent text-text-muted hover:text-text-dark hover:bg-slate-50">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-text-muted group-hover:text-text-dark"></i>
+                <span class="text-xs tracking-tight uppercase">Risk Distribution 风险分布</span>
+            </button>
+            <button onclick="switchView('radar')" id="nav-radar" class="nav-item w-full flex items-center gap-3 px-6 py-3 transition-all duration-200 group border-l-4 border-transparent text-text-muted hover:text-text-dark hover:bg-slate-50">
+                <i data-lucide="radar" class="w-4 h-4 text-text-muted group-hover:text-text-dark"></i>
+                <span class="text-xs tracking-tight uppercase">Forecast Radar 预测雷达</span>
+            </button>
+            <button onclick="switchView('search')" id="nav-search" class="nav-item w-full flex items-center gap-3 px-6 py-3 transition-all duration-200 group border-l-4 border-transparent text-text-muted hover:text-text-dark hover:bg-slate-50">
+                <i data-lucide="search" class="w-4 h-4 text-text-muted group-hover:text-text-dark"></i>
+                <span class="text-xs tracking-tight uppercase">SKU Search 查询中心</span>
+            </button>
+            <button onclick="switchView('settings')" id="nav-settings" class="nav-item w-full flex items-center gap-3 px-6 py-3 transition-all duration-200 group border-l-4 border-transparent text-text-muted hover:text-text-dark hover:bg-slate-50">
+                <i data-lucide="sliders" class="w-4 h-4 text-text-muted group-hover:text-text-dark"></i>
+                <span class="text-xs tracking-tight uppercase">System Settings 系统配置</span>
+            </button>
+        </nav>
+        
+        <!-- Live storage metrics block -->
+        <div class="mt-auto px-6">
+          <div class="p-4 bg-slate-50 rounded-xl border border-primary-brand/10">
+            <p class="text-[10px] font-bold text-primary-brand uppercase tracking-wider mb-1">Global Storage Level</p>
+            <p class="text-xs text-text-muted mb-3" id="capacity-percentage">82% of capacity filled</p>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-primary-brand h-full w-[82%] rounded-full transition-all duration-500" id="capacity-bar"></div>
+            </div>
+          </div>
+        </div>
+    </aside>
+
+    <!-- Main Workspace Container -->
+    <main class="ml-64 mt-16 p-8 min-h-[calc(100vh-64px)] flex flex-col gap-8 flex-1">
+
+        <!-- Banner Alert Segment (General Notifications) -->
+        <div id="general-toast" class="hidden transform translate-y-2 opacity-0 transition-all duration-300 bg-slate-900 text-white rounded-xl py-3 px-6 flex justify-between items-center shadow-lg border border-slate-800">
+            <div class="flex items-center gap-2.5">
+                <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+                <span id="toast-text" class="text-xs font-semibold tracking-wide"></span>
+            </div>
+            <button onclick="hideGeneralToast()" class="text-slate-400 hover:text-white transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- ======================= VIEW: OVERVIEW ======================= -->
+        <div id="view-overview" class="view-content flex flex-col gap-8">
+            <header class="flex justify-between items-center sm:items-start">
+              <div>
+                <h1 class="text-2xl font-bold text-text-dark tracking-tight">Executive Dashboard • 决策看板</h1>
+                <p class="text-text-muted text-sm mt-0.5">全球物流存储网络核心性能Q3综合研判分析表。</p>
+              </div>
+              <button onclick="triggerReportGenerator()" class="bg-primary-brand text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-dark transition-all duration-200 shadow-sm flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0 shadow-blue-500/10">
+                <i data-lucide="trending-up" class="w-4 h-4"></i>
+                生成全球库存报告
+              </button>
+            </header>
+
+            <!-- Cards Grid -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-5">
+              <div class="stat-card p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase text-text-muted mb-2 block">总 SKU 数量</span>
+                  <div class="text-2xl font-bold text-text-dark">142,840</div>
+                </div>
+                <div class="mt-3 flex items-center gap-1 text-[11px] font-semibold text-success-color">
+                  <i data-lucide="trending-up" class="w-3 h-3"></i>
+                  <span>比去年增长 2.4%</span>
+                </div>
+              </div>
+              <div class="stat-card p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase text-text-muted mb-2 block">在库 / 无库存比例</span>
+                  <div class="text-2xl font-bold text-text-dark">94 : 6</div>
+                </div>
+                <div class="mt-3">
+                  <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div class="bg-primary-brand h-full w-[94%]" style="width: 94%;"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="stat-card p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase text-text-muted mb-2 block">总库存价值</span>
+                  <div class="text-2xl font-bold text-text-dark">$12.4M</div>
+                </div>
+                <div class="mt-3 text-[11px] text-text-muted italic">
+                  加权平均仓储成本
+                </div>
+              </div>
+              <div class="stat-card p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase text-text-muted mb-2 block">平均供应天数 (DOS)</span>
+                  <div class="text-2xl font-bold text-text-dark text-error-color">38.2 天</div>
+                </div>
+                <div class="mt-3 flex items-center gap-1 text-[11px] font-semibold text-error-color">
+                  <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                  <span>警告: 相比Q2减少 4.1 天</span>
+                </div>
+              </div>
+              <div class="stat-card p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <span class="text-[10px] font-bold tracking-wider uppercase text-text-muted mb-2 block">90天预测精准覆盖率</span>
+                  <div class="text-2xl font-bold text-text-dark text-success-color">89%</div>
+                </div>
+                <div class="mt-3 flex items-center gap-1 text-[11px] font-semibold text-success-color">
+                  <i data-lucide="check-circle" class="w-3 h-3"></i>
+                  <span>模型运行高精度稳定</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Charts Section (Custom Polished SVG Gauge) -->
+            <section class="grid grid-cols-12 gap-8">
+              <!-- Gauge -->
+              <div class="col-span-12 lg:col-span-5 bg-white rounded-xl border border-border-color shadow-sm p-8 flex flex-col justify-between min-h-[420px]">
+                <div>
+                  <h3 class="text-lg font-bold text-text-dark mb-1">健康指数综合评分</h3>
+                  <p class="text-text-muted text-sm mb-6">质量、产品周转率与自适应预测精度神经网络评测得分。</p>
+                </div>
+                
+                <div class="flex-1 flex items-center justify-center relative">
+                    <!-- Gauge SVG with dynamic count representation -->
+                    <svg class="w-56 h-56 -rotate-90 transform" viewBox="0 0 100 100">
+                        <!-- BG circle -->
+                        <circle cx="50" cy="50" fill="none" r="40" stroke="#f1f5f9" stroke-width="8"></circle>
+                        <!-- Active dynamic circle dashoffset based on 85 score -->
+                        <circle cx="50" cy="50" fill="none" r="40" stroke="#2563eb" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="37.6" stroke-linecap="round"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center mt-2">
+                        <span class="text-5xl font-bold text-text-dark">85</span>
+                        <span class="text-[10px] font-extrabold tracking-widest uppercase text-success-color mt-1">OPTIMAL 理想状态</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-border-color">
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">周转率得分</p>
+                        <p class="text-base font-bold text-text-dark">4.2x</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">库存安全度</p>
+                        <p class="text-base font-bold text-text-dark">92%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">交付合规率</p>
+                        <p class="text-base font-bold text-text-dark">98%</p>
+                    </div>
+                </div>
+              </div>
+
+              <!-- regional bars -->
+              <div class="col-span-12 lg:col-span-7 bg-white rounded-xl border border-border-color shadow-sm p-8 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-lg font-bold text-text-dark mb-1">全球主要区域分布结构</h3>
+                  <p class="text-text-muted text-sm mb-8">实际仓储装载情况（深色条）与Q3预设阈值（浅蓝背景条）比对。</p>
+                </div>
+
+                <div class="space-y-6 flex-1 flex flex-col justify-center">
+                  <!-- Bar item -->
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                      <span class="text-sm font-semibold text-text-dark flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 bg-primary-brand rounded-full"></span>
+                        北美核心战区 (NA Region)
+                      </span>
+                      <span class="text-[11px] font-semibold text-text-muted">42.1k SKU / 目标 95%</span>
+                    </div>
+                    <div class="relative h-3 w-full bg-slate-100 rounded-full">
+                        <div class="absolute h-full rounded-full bg-primary-brand select-none" style="width: 88%; z-index: 10;"></div>
+                        <div class="absolute h-full rounded-full bg-blue-100" style="width: 95%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Bar item -->
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                      <span class="text-sm font-semibold text-text-dark flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 bg-primary-brand rounded-full"></span>
+                        西欧及中东走廊集群 (EMEA CC)
+                      </span>
+                      <span class="text-[11px] font-semibold text-text-muted">38.4k SKU / 目标 90%</span>
+                    </div>
+                    <div class="relative h-3 w-full bg-slate-100 rounded-full">
+                        <div class="absolute h-full rounded-full bg-primary-brand select-none" style="width: 92%; z-index: 10;"></div>
+                        <div class="absolute h-full rounded-full bg-blue-100" style="width: 90%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Bar item -->
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                      <span class="text-sm font-semibold text-text-dark flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 bg-error-color rounded-full"></span>
+                        亚太东部与东盟供应链 (APAC EA)
+                      </span>
+                      <span class="text-[11px] font-semibold text-text-muted text-error-color">54.2k SKU / 目标 85% (高载预警)</span>
+                    </div>
+                    <div class="relative h-3 w-full bg-slate-100 rounded-full">
+                        <div class="absolute h-full rounded-full bg-error-color select-none" style="width: 94%; z-index: 10;"></div>
+                        <div class="absolute h-full rounded-full bg-red-100" style="width: 85%;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Bar item -->
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                      <span class="text-sm font-semibold text-text-dark flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 bg-primary-brand rounded-full"></span>
+                        拉美南部边缘自愈骨干网 (LATAM)
+                      </span>
+                      <span class="text-[11px] font-semibold text-text-muted">12.1k SKU / 目标 92%</span>
+                    </div>
+                    <div class="relative h-3 w-full bg-slate-100 rounded-full">
+                        <div class="absolute h-full rounded-full bg-primary-brand select-none" style="width: 75%; z-index: 10;"></div>
+                        <div class="absolute h-full rounded-full bg-blue-100" style="width: 92%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Alerts Table Section -->
+            <section class="bg-white rounded-xl border border-border-color overflow-hidden shadow-sm">
+                <div class="p-6 border-b border-border-color flex justify-between items-center bg-slate-50">
+                  <div>
+                    <h3 class="text-base font-bold text-text-dark">关键性能指标突发告警清单</h3>
+                    <p class="text-text-muted text-xs mt-0.5">过去24小时内监测到边缘物流节点偏向数据异常和超标报告。</p>
+                  </div>
+                  <!-- Dropdown classification -->
+                  <div class="flex items-center gap-3">
+                    <select onchange="filterAlerts(this.value)" class="text-xs border border-border-color rounded-lg bg-white p-2 text-text-dark focus:outline-none focus:ring-1 focus:ring-primary-brand">
+                        <option value="all">显示全部级别</option>
+                        <option value="high">高风险 (RED)</option>
+                        <option value="medium">中风险 (YELLOW)</option>
+                        <option value="low">低风险 (BLUE)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="bg-slate-50 border-b border-border-color">
+                        <th class="px-8 py-3.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">告警类别 / 指标</th>
+                        <th class="px-8 py-3.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">受影响节点</th>
+                        <th class="px-8 py-3.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">严重程度</th>
+                        <th class="px-8 py-3.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">财务影响估值等比</th>
+                        <th class="px-8 py-3.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">边缘响应决策</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="alerts-tbody">
+                      <!-- Alert row 1 -->
+                      <tr class="alert-row hover:bg-slate-50/50 transition-colors" data-severity="high">
+                        <td class="px-8 py-5">
+                          <div class="flex items-center gap-3">
+                            <span class="text-error-color fill-current"><i data-lucide="alert-octagon" class="w-4 h-4"></i></span>
+                            <span class="font-semibold text-sm text-text-dark">严重短缺（缺货率超出阈值）</span>
+                          </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-text-dark">上海第二自运转仓储极核 (SH-04)</td>
+                        <td class="px-8 py-5">
+                          <span class="px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-red-100 text-red-800">高风险 RED</span>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-bold text-text-dark">每周阻断额约 $1.2M</td>
+                        <td class="px-8 py-5">
+                          <button onclick="triggerDecisionModal('重新调度边缘运力并调整上海中置枢纽供需策略', '$1.2M', 'SH-04')" class="flex items-center gap-1.5 text-primary-brand hover:text-primary-dark font-bold text-[11px] uppercase cursor-pointer hover:underline transition-all">
+                            启动智能重路由机制 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </td>
+                      </tr>
+
+                      <!-- Alert row 2 -->
+                      <tr class="alert-row hover:bg-slate-50/50 transition-colors" data-severity="medium">
+                        <td class="px-8 py-5">
+                          <div class="flex items-center gap-3">
+                            <span class="text-warning-color fill-current"><i data-lucide="info" class="w-4 h-4"></i></span>
+                            <span class="font-semibold text-sm text-text-dark">供需关系周期性失衡预测</span>
+                          </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-text-dark">柏林国际骨干总枢纽 (BE-01)</td>
+                        <td class="px-8 py-5">
+                          <span class="px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-amber-100 text-amber-800">中度 AMBER</span>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-bold text-text-dark">每月流转损耗额 $420k</td>
+                        <td class="px-8 py-5">
+                          <button onclick="triggerDecisionModal('微调柏林枢纽中转分批装载率与运价周期参数', '$420k', 'BE-01')" class="flex items-center gap-1.5 text-primary-brand hover:text-primary-dark font-bold text-[11px] uppercase cursor-pointer hover:underline transition-all">
+                            动态校准系统权重 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </td>
+                      </tr>
+
+                      <!-- Alert row 3 -->
+                      <tr class="alert-row hover:bg-slate-50/50 transition-colors" data-severity="low">
+                        <td class="px-8 py-5">
+                          <div class="flex items-center gap-3">
+                            <span class="text-primary-brand fill-current"><i data-lucide="package-x" class="w-4 h-4"></i></span>
+                            <span class="font-semibold text-sm text-text-dark">超量极值占地冗余警报</span>
+                          </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-text-dark">芝加哥保税及分发第三园区 (CH-09)</td>
+                        <td class="px-8 py-5">
+                          <span class="px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider bg-blue-100 text-blue-800">轻度 BLUE</span>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-bold text-text-dark">$180k 现货冗余堆积</td>
+                        <td class="px-8 py-5">
+                          <button onclick="triggerDecisionModal('削减下期订货排程并优先在LATAM及周边大仓开展尾货清货优惠计划', '$180k', 'CH-09')" class="flex items-center gap-1.5 text-primary-brand hover:text-primary-dark font-bold text-[11px] uppercase cursor-pointer hover:underline transition-all">
+                            执行主动排库清理程序 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ======================= VIEW: RISK DISTRIBUTION ======================= -->
+        <div id="view-risk" class="view-content hidden flex flex-col gap-8">
+            <header>
+                <h1 class="text-2xl font-bold text-text-dark tracking-tight">Global Risk Distribution • 全球网络安全透视</h1>
+                <p class="text-text-muted text-sm mt-0.5">跨区域枢纽的实时负载、气象、仓容及可用冗余多维量化矩阵。</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Card Risk Node -->
+                <div class="bg-white p-6 rounded-xl border border-border-color shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 uppercase">高危高载</span>
+                            <h4 class="text-base font-bold text-text-dark mt-2">亚太核心极核 (APAC-04)</h4>
+                            <p class="text-xs text-text-muted mt-1 font-medium">地理区位：中国上海分发总港</p>
+                        </div>
+                        <span class="w-2.5 h-2.5 bg-error-color rounded-full sync-pulse"></span>
+                    </div>
+                    <div class="my-6 space-y-3">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">仓位占用率:</span>
+                            <span class="font-bold text-text-dark">94.8% (超载报警)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-error-color h-full w-[94.8%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">主要风险源:</span>
+                            <span class="font-semibold text-error-color">集装箱极度积压/缺工人</span>
+                        </div>
+                    </div>
+                    <button onclick="triggerRedistributeSimulator('APAC-04')" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-xs font-semibold transition-colors">自动调节疏散流控计划</button>
+                </div>
+
+                <!-- Card Risk Node -->
+                <div class="bg-white p-6 rounded-xl border border-border-color shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 uppercase">亚安全波动</span>
+                            <h4 class="text-base font-bold text-text-dark mt-2">西欧通道枢纽 (EMEA-01)</h4>
+                            <p class="text-xs text-text-muted mt-1 font-medium">地理区位：德国柏林主枢纽</p>
+                        </div>
+                        <span class="w-2.5 h-2.5 bg-warning-color rounded-full"></span>
+                    </div>
+                    <div class="my-6 space-y-3">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">仓位占用率:</span>
+                            <span class="font-bold text-text-dark">78.2% (平稳)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-warning-color h-full w-[78.2%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">主要风险源:</span>
+                            <span class="font-semibold text-warning-color">海运周期波动及燃油修正</span>
+                        </div>
+                    </div>
+                    <button onclick="triggerRedistributeSimulator('EMEA-01')" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-xs font-semibold transition-colors">优化中转航线平衡</button>
+                </div>
+
+                <!-- Card Risk Node -->
+                <div class="bg-white p-6 rounded-xl border border-border-color shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 uppercase">高度安全</span>
+                            <h4 class="text-base font-bold text-text-dark mt-2">拉美南美港仓 (LATAM-12)</h4>
+                            <p class="text-xs text-text-muted mt-1 font-medium">地理区位：巴西圣保罗仓</p>
+                        </div>
+                        <span class="w-2.5 h-2.5 bg-success-color rounded-full"></span>
+                    </div>
+                    <div class="my-6 space-y-3">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">仓位占用率:</span>
+                            <span class="font-bold text-text-dark">44.1% (富余大量)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-success-color h-full w-[44.1%] rounded-full"></div>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-text-muted">主要风险源:</span>
+                            <span class="font-semibold text-success-color">无安全冗余隐患</span>
+                        </div>
+                    </div>
+                    <button onclick="triggerRedistributeSimulator('LATAM-12')" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-2 rounded-lg text-xs font-semibold transition-colors">锁定为承接接收舱位</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= VIEW: FORECAST RADAR ======================= -->
+        <div id="view-radar" class="view-content hidden flex flex-col gap-8">
+            <header>
+                <h1 class="text-2xl font-bold text-text-dark tracking-tight">Forecast Radar • AI自适应预测雷达</h1>
+                <p class="text-text-muted text-sm mt-0.5">多因子时序预测引擎智能运算分析结构（90天高维外推算法）。</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Simulated Time-series chart segment using SVG styled beautiful paths -->
+                <div class="bg-white p-8 rounded-xl border border-border-color shadow-sm lg:col-span-8 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-base font-bold text-text-dark">时序预测高维动态变化特征</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-blue-600 rounded-full"></span>
+                                <span class="text-xs text-text-muted mr-4">基础Q3趋势</span>
+                                <span class="w-3 h-3 bg-emerald-500 rounded-full"></span>
+                                <span class="text-xs text-text-muted">AI 增益修正</span>
+                            </div>
+                        </div>
+                        <!-- Custom Vector Chart Area representing multi layered temporal forecasts -->
+                        <div class="w-full h-64 bg-slate-50 border border-slate-100 rounded-xl relative p-4 flex flex-col justify-end">
+                            <svg class="w-full h-48" viewBox="0 0 500 100" preserveAspectRatio="none">
+                                <!-- Base line path -->
+                                <path d="M 0,80 Q 80,40 160,70 T 320,30 T 480,50 L 500,55" fill="none" stroke="#2563eb" stroke-width="2.5"></path>
+                                <!-- AI corrected model curve -->
+                                <path d="M 0,80 Q 80,30 160,50 T 320,15 T 480,35 L 500,38" fill="none" stroke="#10b981" stroke-width="2.5" stroke-dasharray="3,3"></path>
+                            </svg>
+                            <!-- Custom X axis annotations -->
+                            <div class="flex justify-between text-[10px] text-text-muted font-bold tracking-wider mt-4">
+                                <span>1月 (M1)</span>
+                                <span>2月 (M2)</span>
+                                <span>3月 (M3)</span>
+                                <span>4月 (M4)</span>
+                                <span>5月 (M5)</span>
+                                <span>6月 (M6)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-slate-50 rounded-lg text-xs text-text-muted border border-border-color leading-relaxed">
+                        基于高频预测时序模型在亚太、美西和拉美总航线修正得出，当前90天内预计全球周转提速 <b>+3.4%</b>，总库存峰值期预计将延后2.5周到达。
+                    </div>
+                </div>
+
+                <!-- Sidebar insights of model calibration -->
+                <div class="bg-white p-8 rounded-xl border border-border-color shadow-sm lg:col-span-4 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-text-dark mb-4">自动预测健康效验度</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-text-muted font-semibold">自学习样本拟合度 (R-squared)</span>
+                                    <span class="font-bold text-text-dark">0.965 (高)</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-emerald-500 h-full w-[96.5%]" style="width: 96.5%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-text-muted font-semibold">平均百分比绝对误差 (MAP)</span>
+                                    <span class="font-bold text-text-dark">3.12% (极优)</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-blue-600 h-full w-[91.2%]" style="width: 91.2%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="triggerModelManualRecalibrate()" class="w-full bg-primary-brand hover:bg-primary-dark text-white py-2 rounded-lg text-xs font-semibold mt-8 transition-colors">重新触发多因子时变学习</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= VIEW: SKU SEARCH ======================= -->
+        <div id="view-search" class="view-content hidden flex flex-col gap-8">
+            <header>
+                <h1 class="text-2xl font-bold text-text-dark tracking-tight">SKU Spec Query Center • 物流检索与库存深度查询</h1>
+                <p class="text-text-muted text-sm mt-0.5">支持全局模糊字段、编码关键字及库位条件的高速精准检索机制。</p>
+            </header>
+
+            <div class="bg-white p-8 rounded-xl border border-border-color shadow-sm">
+                <!-- Fast Search interface -->
+                <div class="flex flex-col sm:flex-row gap-4 mb-8">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4"></i>
+                        <input type="text" id="sku-search-input" placeholder="输入任意枢纽编码 (如 SH-04, BE-01, CH-09) 或 SKU编号..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-border-color rounded-lg text-sm text-text-dark placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-brand focus:border-primary-brand">
+                    </div>
+                    <button onclick="executeSKULocalSearch()" class="bg-primary-brand text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-dark transition-colors flex items-center gap-2 justify-center shrink-0">
+                        <i data-lucide="filter" class="w-4 h-4"></i>
+                        智能匹配筛选
+                    </button>
+                    <button onclick="resetSKUSearch()" class="bg-slate-100 text-slate-700 hover:bg-slate-200 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 justify-center shrink-0">
+                        重置搜索
+                    </button>
+                </div>
+
+                <!-- Query Results table with mock parameters -->
+                <div class="overflow-x-auto rounded-lg border border-slate-100">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-[10px] font-bold text-text-muted tracking-wider border-b border-border-color">
+                                <th class="px-6 py-3">SKU 注册标编号</th>
+                                <th class="px-6 py-3">物料分类项</th>
+                                <th class="px-6 py-3">所属大仓节点</th>
+                                <th class="px-6 py-3">实测可用在库量</th>
+                                <th class="px-6 py-3">安全警戒仓值</th>
+                                <th class="px-6 py-3">最近数据质检检测</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sku-results-tablebody" class="divide-y divide-slate-100 text-sm">
+                            <tr class="sku-table-row hover:bg-slate-50/50" data-code="SH-04 SKU-4029">
+                                <td class="px-6 py-4 font-semibold text-text-dark">SKU-4029-XJ4</td>
+                                <td class="px-6 py-4 text-text-muted">冷链生鲜（特级）</td>
+                                <td class="px-6 py-4 font-medium text-text-dark">上海极核 (SH-04)</td>
+                                <td class="px-6 py-4 text-error-color font-bold">120 件 (急缺货)</td>
+                                <td class="px-6 py-4 text-text-muted">1,500 件</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-red-100 text-red-800">未到安全水位</span></td>
+                            </tr>
+                            <tr class="sku-table-row hover:bg-slate-50/50" data-code="BE-01 SKU-8902">
+                                <td class="px-6 py-4 font-semibold text-text-dark">SKU-8902-KL8</td>
+                                <td class="px-6 py-4 text-text-muted">高值精密仪器配件</td>
+                                <td class="px-6 py-4 font-medium text-text-dark">柏林枢纽 (BE-01)</td>
+                                <td class="px-6 py-4 text-text-dark font-bold">3,890 件</td>
+                                <td class="px-6 py-4 text-text-muted">4,000 件</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-100 text-amber-800">略偏微失衡</span></td>
+                            </tr>
+                            <tr class="sku-table-row hover:bg-slate-50/50" data-code="CH-09 SKU-1049">
+                                <td class="px-6 py-4 font-semibold text-text-dark">SKU-1049-ZN9</td>
+                                <td class="px-6 py-4 text-text-muted">大件工业标准散货</td>
+                                <td class="px-6 py-4 font-medium text-text-dark">芝加哥保税区 (CH-09)</td>
+                                <td class="px-6 py-4 text-text-dark font-bold">12,180 件 (积压过度)</td>
+                                <td class="px-6 py-4 text-text-muted">8,000 件</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-blue-100 text-blue-800">超承载预警</span></td>
+                            </tr>
+                            <tr class="sku-table-row hover:bg-slate-50/50" data-code="LATAM-12 SKU-2204">
+                                <td class="px-6 py-4 font-semibold text-text-dark">SKU-2204-BR2</td>
+                                <td class="px-6 py-4 text-text-muted">消费电子快消快充件</td>
+                                <td class="px-6 py-4 font-medium text-text-dark">圣保罗港仓 (LATAM-12)</td>
+                                <td class="px-6 py-4 text-emerald-500 font-bold">4,500 件</td>
+                                <td class="px-6 py-4 text-text-muted">3,000 件</td>
+                                <td class="px-6 py-4"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-emerald-100 text-emerald-800">高度平稳</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= VIEW: SYSTEM SETTINGS ======================= -->
+        <div id="view-settings" class="view-content hidden flex flex-col gap-8">
+            <header>
+                <h1 class="text-2xl font-bold text-text-dark tracking-tight">System Global Settings • 系统参数配置及调频</h1>
+                <p class="text-text-muted text-sm mt-0.5">跨国家大仓的交互联动模式、自愈同步周期及数据接口配额自定义。</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+                <!-- Left panel system form -->
+                <div class="bg-white p-8 rounded-xl border border-border-color shadow-sm md:col-span-8 space-y-6">
+                    <h3 class="text-base font-bold text-text-dark border-b border-slate-100 pb-3">基础功能配置</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-text-dark">静音及全局突发声音报警</h4>
+                                <p class="text-xs text-text-muted">检测到特大物流缺口及重大货损时自动以声音示警。</p>
+                            </div>
+                            <input type="checkbox" checked class="w-10 h-5 bg-slate-200 border border-slate-300 rounded-full appearance-none cursor-pointer checked:bg-primary-brand relative transition-all duration-300 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 checked:before:translate-x-5 before:transition-all before:duration-300">
+                        </div>
+                        <hr class="border-slate-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-text-dark">主动边缘流控限制</h4>
+                                <p class="text-xs text-text-muted">亚太和西欧拥堵分发点主动对下行订单启动限流拦截。</p>
+                            </div>
+                            <input type="checkbox" class="w-10 h-5 bg-slate-200 border border-slate-300 rounded-full appearance-none cursor-pointer checked:bg-primary-brand relative transition-all duration-300 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-white before:top-0.5 before:left-0.5 checked:before:translate-x-5 before:transition-all before:duration-300">
+                        </div>
+                        <hr class="border-slate-100">
+                        <div>
+                            <label class="text-xs font-bold text-text-dark uppercase tracking-wider block mb-2">流向再载自学习周期控制 (Cron Period)</label>
+                            <input type="range" class="w-full accent-primary-brand" min="1" max="60" value="12">
+                            <div class="flex justify-between text-[11px] text-text-muted mt-2 font-medium">
+                                <span>1 分钟 (极限运算)</span>
+                                <span>12 分钟 (当前缺省配置)</span>
+                                <span>60 分钟 (极低功耗)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="saveGlobalSettings()" class="bg-primary-brand hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm">保存系统修改</button>
+                </div>
+
+                <!-- Right sidebar details -->
+                <div class="bg-white p-8 rounded-xl border border-border-color shadow-sm md:col-span-4 space-y-6 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-text-dark border-b border-slate-100 pb-3">数据库健康校验度</h3>
+                        <div class="pt-4 space-y-4">
+                            <div class="flex justify-between text-xs">
+                                <span class="text-text-muted">中央数据库通信状态:</span>
+                                <span class="text-emerald-500 font-bold">100% 畅通稳定</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-text-muted">下辖大仓连接自愈率:</span>
+                                <span class="text-emerald-500 font-bold">99.98% 正常复位</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-text-muted">主服务器运行负载:</span>
+                                <span class="text-text-dark font-bold">14.12% 资源利用</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 border border-border-color rounded-xl">
+                        <p class="text-xs font-semibold text-text-muted leading-relaxed">
+                            注：如果上海、柏林或芝加哥大仓检测到重构问题，请立刻触发边缘恢复按键。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Interactive Confirm Modal Dialogs -->
+    <div id="decision-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+        <div class="bg-white w-full max-w-md rounded-2xl border border-border-color shadow-2xl p-6 transform scale-95 opacity-0 transition-all duration-300" id="modal-box">
+            <h3 class="text-lg font-bold text-text-dark mb-2 flex items-center gap-2">
+                <i data-lucide="shield-alert" class="w-5 h-5 text-primary-brand"></i>
+                边缘响应决策确认
+            </h3>
+            <p id="modal-desc" class="text-xs text-text-muted leading-relaxed mb-6"></p>
+            
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-border-color mb-6 space-y-2">
+                <div class="flex justify-between text-xs">
+                    <span class="text-text-muted">受损点识别码:</span>
+                    <span id="modal-node-id" class="font-bold text-text-dark"></span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-text-muted">最大预测流失减震估算:</span>
+                    <span id="modal-estimated-saving" class="font-bold text-emerald-500"></span>
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeDecisionModal()" class="px-4 py-2 border border-border-color rounded-lg text-xs font-semibold text-text-muted hover:bg-slate-50 transition-colors">放弃</button>
+                <button onclick="executeActionDecision()" class="px-5 py-2 bg-primary-brand hover:bg-primary-dark text-white rounded-lg text-xs font-semibold transition-colors">锁定响应执行</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Controller for Vanilla JS Navigation and Features -->
+    <script>
+        // Set state values
+        let currentSyncTime = 12;
+
+        // View dynamic switching
+        function switchView(viewName) {
+            // Hide all view panels
+            const views = document.querySelectorAll('.view-content');
+            views.forEach(view => {
+                view.classList.add('hidden');
+            });
+
+            // Show target view panel
+            const targetView = document.getElementById(`view-${viewName}`);
+            if (targetView) {
+                targetView.classList.remove('hidden');
+            }
+
+            // Remove active classes from navigation items
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.classList.remove('bg-surface-container-high', 'text-primary-brand', 'font-semibold', 'border-primary-brand');
+                item.classList.add('border-transparent');
+            });
+
+            // Activate current selection
+            const activeNav = document.getElementById(`nav-${viewName}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-surface-container-high', 'text-primary-brand', 'font-semibold', 'border-primary-brand');
+                activeNav.classList.remove('border-transparent');
+            }
+
+            // Slide in effect or reinitialize icons
+            lucide.createIcons();
+            showGeneralNotification(`已成功切换到 ${viewName.toUpperCase()} 视图！`);
+        }
+
+        // Switch category tabs in Top Bar
+        function switchCategory(categoryName) {
+            const tabs = document.querySelectorAll('.category-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('text-primary-brand', 'border-primary-brand');
+                tab.classList.add('text-text-muted', 'border-transparent');
+            });
+
+            const activeTab = document.getElementById(`tab-${categoryName}`);
+            if (activeTab) {
+                activeTab.classList.add('text-primary-brand', 'border-primary-brand');
+                activeTab.classList.remove('text-text-muted', 'border-transparent');
+            }
+
+            showGeneralNotification(`分类已切换到: ${categoryName.toUpperCase()}`);
+        }
+
+        // Show generic feedback text (Toast)
+        function showGeneralNotification(text) {
+            const toast = document.getElementById('general-toast');
+            const toastText = document.getElementById('toast-text');
+            if (toast && toastText) {
+                toastText.innerText = text;
+                toast.classList.remove('hidden');
+                setTimeout(() => {
+                    toast.classList.remove('opacity-0', 'translate-y-2');
+                }, 50);
+
+                // Auto-hide toast after 4s
+                setTimeout(() => {
+                    hideGeneralToast();
+                }, 4000);
+            }
+        }
+
+        function hideGeneralToast() {
+            const toast = document.getElementById('general-toast');
+            if (toast) {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        // Table filters
+        function filterAlerts(severity) {
+            const rows = document.querySelectorAll('.alert-row');
+            rows.forEach(row => {
+                const rowSeverity = row.getAttribute('data-severity');
+                if (severity === 'all' || rowSeverity === severity) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+            showGeneralNotification(`已为您筛选：${severity.toUpperCase()} 指标严重程度`);
+        }
+
+        // Simulated background sync refresh functionality
+        function refreshSyncData() {
+            const syncBtn = document.getElementById('sync-btn');
+            const syncText = document.getElementById('sync-text');
+            if (syncBtn && syncText) {
+                syncText.innerText = "正在进行全局自愈核验同步...";
+                syncBtn.classList.add('bg-blue-50', 'text-primary-brand');
+
+                setTimeout(() => {
+                    currentSyncTime = 0;
+                    syncText.innerText = `本次同步: 刚刚`;
+                    syncBtn.classList.remove('bg-blue-50', 'text-primary-brand');
+                    
+                    // Slightly increase/decrease values for live state
+                    const capacityValueElem = document.getElementById('capacity-percentage');
+                    const capacityBar = document.getElementById('capacity-bar');
+                    if (capacityValueElem && capacityBar) {
+                        capacityValueElem.innerText = "84% of capacity filled";
+                        capacityBar.style.width = "84%";
+                    }
+                    showGeneralNotification("自适应调仓协议和分布式自愈核对已完成更新！");
+                }, 1500);
+            }
+        }
+
+        // Generate full report simulator
+        function triggerReportGenerator() {
+            showGeneralNotification("正在深度编译全球大仓自组装PDF Q3数据报告...");
+            setTimeout(() => {
+                showGeneralNotification("报告生成成功！已为您自动触发本地流式下载保存。");
+            }, 2000);
+        }
+
+        // Search features inside local SKU array
+        function executeSKULocalSearch() {
+            const query = document.getElementById('sku-search-input').value.toLowerCase().trim();
+            const rows = document.querySelectorAll('.sku-table-row');
+            let matched = 0;
+
+            rows.forEach(row => {
+                const meta = row.getAttribute('data-code').toLowerCase();
+                if (query === '' || meta.includes(query)) {
+                    row.classList.remove('hidden');
+                    matched++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+
+            showGeneralNotification(`查询匹配到 ${matched} 个符合条件的全球SKU大仓库位。`);
+        }
+
+        function resetSKUSearch() {
+            document.getElementById('sku-search-input').value = '';
+            executeSKULocalSearch();
+        }
+
+        // Modal triggers and operations
+        let activeDecisionAction = '';
+        function triggerDecisionModal(actionRequired, estimatedSaving, nodeId) {
+            const modal = document.getElementById('decision-modal');
+            const box = document.getElementById('modal-box');
+            
+            document.getElementById('modal-desc').innerText = `本项自愈操作旨在在下个业务周期自动： "${actionRequired}"。这将大幅抑制下行流失和枢纽堆积。`;
+            document.getElementById('modal-node-id').innerText = nodeId;
+            document.getElementById('modal-estimated-saving').innerText = estimatedSaving;
+
+            activeDecisionAction = actionRequired;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('opacity-0', 'scale-95');
+            }, 100);
+        }
+
+        function closeDecisionModal() {
+            const modal = document.getElementById('decision-modal');
+            const box = document.getElementById('modal-box');
+            
+            box.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function executeActionDecision() {
+            closeDecisionModal();
+            showGeneralNotification(`决策确认下发成功！智能策略已锁定，正在广播下发边缘控制协议："${activeDecisionAction}"。`);
+        }
+
+        // Secondary simulated dashboard actions
+        function triggerRedistributeSimulator(nodeId) {
+            showGeneralNotification(`正在智能筹划枢纽 ${nodeId} 的就近货量外溢倾斜分摊策略...`);
+            setTimeout(() => {
+                showGeneralNotification(`已成功削减 ${nodeId} 分发池，溢出货流已被引导重新注册至备用骨干接收网点！`);
+            }, 1500);
+        }
+
+        function triggerModelManualRecalibrate() {
+            showGeneralNotification("正在重平衡AI自回归模型权重...进行 10,000 次蒙特卡洛随机逼近拟合中。");
+            setTimeout(() => {
+                showGeneralNotification("模型优化完成！平均 MAP 精度指标下修并提纯至 2.91%。");
+            }, 2500);
+        }
+
+        function saveGlobalSettings() {
+            showGeneralNotification("系统环境配置更改成功！正在刷新并重新引导主控制台数据桥接器...");
+        }
+
+        // Initial setup and startup routines
+        window.addEventListener('DOMContentLoaded', () => {
+            // Render beautiful crispy SVG indices natively (Lucide loader)
+            lucide.createIcons();
+
+            // Periodic task updating timer text to simulate authentic activity
+            setInterval(() => {
+                currentSyncTime++;
+                const syncText = document.getElementById('sync-text');
+                if (syncText && currentSyncTime > 0) {
+                    syncText.innerText = `上次同步: ${currentSyncTime}分钟前`;
+                }
+            }, 60000);
+        });
+    </script>
+</body>
+</html>
